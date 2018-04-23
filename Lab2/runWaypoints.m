@@ -1,28 +1,31 @@
 close all;
-% if(exist('SP')~=1)
-%     SP=serial_port_start('/dev/cu.usbserial');
-%     pioneer_init(SP);
-% end
+clear waypoints;
+if(exist('SP')~=1)
+    SP=serial_port_start('/dev/cu.usbserial');
+    pioneer_init(SP);
+end
+
 
 %waypoints=[0 0;2 0;2 18;17 18;17 3;2 3;2 0;0 0];
-
-waypoints=[0 0;2 0];
+pose=pioneer_read_odometry()
+waypoints=[pose(1)/1000 pose(2)/1000,pose(1)/1000+1 pose(2)/1000];
 waypoints=waypoints.*1000;
 proportional_heading_error=10;
-proportional_heading_step=25;%percentage
+proportional_heading_step=100;%percentage
 waypoint_threshold=250;%Value in mm
-maxspeed=500;
+maxspeed=200;
 linearspeed=0;
 angularspeed=0;
 distancerun=0;
 error_w=0;
 T=0.5;
-current_position=[0 0];
-current_heading=0;
+current_position=[pose(1)/1000 pose(2)/1000];
+current_heading=degtorad((360*pose(3))/4096);;
 hold on
 scatter(waypoints(:,1),waypoints(:,2),'b')
 scatter(current_position(1),current_position(2),'r');
 for i = 1:length(waypoints)
+    
     [w,d]=calculateHeading(current_position(1),current_position(2),waypoints(i,1),waypoints(i,2));
     if(i<length(waypoints))
         while(d>waypoint_threshold)
@@ -46,9 +49,10 @@ for i = 1:length(waypoints)
 
             angularspeed=-((error)*(proportional_heading_step)/100)/T;
             
-            [pose(1),pose(2),pose(3)]=robot(current_position(1),current_position(2),current_heading,linearspeed,angularspeed,T,distancerun);
-            %pioneer_set_controls(SP,linearspeed,angularspeed);
-            %[pose(1),pose(2),pose(3)]=pioneer_read_odometry(SP);
+            %[pose(1),pose(2),pose(3)]=robot(current_position(1),current_position(2),current_heading,linearspeed,angularspeed,T,distancerun);
+            pioneer_set_controls(SP,round(linearspeed,0),round(angularspeed,0));
+            pose=pioneer_read_odometry();
+            pose(3)=degtorad((360*pose(3))/4096);
             scatter(pose(1),pose(2),'r');
             [pose(1),pose(2),pose(3)]=correctOdometry(pose,distancerun,error_w);
 
@@ -80,14 +84,15 @@ for i = 1:length(waypoints)
            
             
             m=min(((d-50)/1500),1)*min(1,1/(proportional_heading_error*abs(error)));
-            a=0;
+            a=50;
             linearspeed=min(maxspeed,(a+m*maxspeed));
             
             angularspeed=-((error)*(proportional_heading_step)/100)/T;
             
-            [pose(1),pose(2),pose(3)]=robot(current_position(1),current_position(2),current_heading,linearspeed,angularspeed,T,distancerun);
-            %pioneer_set_controls(SP,linearspeed,angularspeed);
-            %[pose(1),pose(2),pose(3)]=pioneer_read_odometry(SP);
+            %[pose(1),pose(2),pose(3)]=robot(current_position(1),current_position(2),current_heading,linearspeed,angularspeed,T,distancerun);
+            pioneer_set_controls(SP,round(linearspeed,0),round(angularspeed,0));
+            pose=pioneer_read_odometry();
+            pose(3)=degtorad((360*pose(3))/4096);
             scatter(pose(1),pose(2),'r');
             [pose(1),pose(2),pose(3)]=correctOdometry(pose,distancerun,error_w);
             
@@ -108,7 +113,7 @@ for i = 1:length(waypoints)
     
 end
 
-%pioneer_set_controls(SP,0,0);
+pioneer_set_controls(SP,0,0);
            
 
 hold off;
