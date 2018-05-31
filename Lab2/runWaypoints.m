@@ -12,7 +12,7 @@ correction_waypoints=[999999 9999999;9999999 9999999];%[3 8.5;3 14.20;10.35 18.1
 %waypoints=[0 0;3 0;3 18;18.42 18;18.42 3.21;3 3.21;3 0;0 0];
 
 %28/05
-waypoints=[0 0;3 0;3.0 18.25;20.0 18.65;24.35 1.85;9.55 -3;9.60 -7.2;6.5 -8];
+waypoints=[0 0;3 0;3.0 18.25;20.0 18.65;24.35 1.85;9.55 -3;10.40 -7.2;6.8 -8.5];
 
 %Shiffed waypoints
 %waypoints=[0 0;3 0;3 17.6;20.2 17.6;20.2 3.21;3 3.21;3 0;0 0];
@@ -38,7 +38,7 @@ waypoints=waypoints.*1000;
 proportional_heading_error=10;
 proportional_heading_step=50;%percentage
 waypoint_threshold=250;%Value in mmc
-maxspeed=700;
+maxspeed=500;
 linearspeed=0;
 angularspeed=0;
 distancerun=0;
@@ -167,8 +167,8 @@ for i = 1:length(waypoints)
             pause(0.05);
         end
     else
-        heading_strengh=1.95;
-        while(d>waypoint_threshold/2)
+        heading_strengh=2;
+        while(d>waypoint_threshold/2.4)
             current_position=current_position+offset;
             
             [w,d]=calculateHeading(current_position(1),current_position(2),waypoints(i,1),waypoints(i,2));
