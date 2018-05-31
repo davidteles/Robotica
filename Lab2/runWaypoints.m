@@ -9,7 +9,23 @@ pioneer_init(SP);
 correction_waypoints=[999999 9999999;9999999 9999999];%[3 8.5;3 14.20;10.35 18.10;17.42 16.10;17.14 3.21];
 
 %measure points
-waypoints=[0 0;3 0;3 18;10.35 18;18.42 18;18.42 3.21;3 3.21;3 0;0 0];
+%waypoints=[0 0;3 0;3 18;18.42 18;18.42 3.21;3 3.21;3 0;0 0];
+
+%28/05
+waypoints=[0 0;3 0;3.0 18.25;20.0 18.65;24.35 1.85;9.55 -3;9.60 -7.2;6.5 -8];
+
+%Shiffed waypoints
+%waypoints=[0 0;3 0;3 17.6;20.2 17.6;20.2 3.21;3 3.21;3 0;0 0];
+%Wayponts do 5
+%waypoints=[0 0;3 0;3 17.6;20.7 17.6;20.7 0;5 0;5 -3;0 -3];
+
+extra=0;
+%waypoints=[0 0;3 0;3 3.21;18.42 3.21;3 17.6;18.42 17.6;3 0;0 0];
+% 
+%extra=5;
+%Corret measure waypoints 
+%waypoints=[0 0;3 0;3 18.1;17.42 17.1;18.42 3.21;3 3.21;3 0;0 0];
+
 
 %waypoints=[0 0;3 0;3 4;3 18.5;17 18.5;17 4;3 4;3 0;0 0];
 %waypoints=[0 0;3 0;3 4;17 4;17 18.5;3 18.5;3 4;3 0;0 0];
@@ -21,12 +37,12 @@ correction_waypoints=correction_waypoints.*1000;
 waypoints=waypoints.*1000;
 proportional_heading_error=10;
 proportional_heading_step=50;%percentage
-waypoint_threshold=350;%Value in mm
-maxspeed=250;
+waypoint_threshold=250;%Value in mmc
+maxspeed=700;
 linearspeed=0;
 angularspeed=0;
 distancerun=0;
-error_w=degtorad(-0.35);
+error_w=degtorad(0.37);
 %error_w=0;
 T=0.5;
 offset = [0 0];
@@ -36,19 +52,19 @@ hold on
 scatter(waypoints(:,1),waypoints(:,2),'b')
 scatter(current_position(1),current_position(2),'r');
 for i = 1:length(waypoints)
-    
+    i
     [w,d]=calculateHeading(current_position(1),current_position(2),waypoints(i,1),waypoints(i,2));
     
     if(i<length(waypoints))
         
         while(d>waypoint_threshold)
             
-            
+            sonar=pioneer_read_sonars();
             for j=1:length(correction_waypoints)
                 [b,d_temp]=calculateHeading(current_position(1),current_position(2),correction_waypoints(j,1),correction_waypoints(j,2));
                
                 if(d_temp<400)
-                    sonar=pioneer_read_sonars();
+                   
                     if(length(sonar)>7)
                         %read sonar 1-Left and 8-Right to correct the
                         %offset
@@ -89,7 +105,12 @@ for i = 1:length(waypoints)
 
             m=max(0,min(((d-500)/2500),1))*min(1,1/(proportional_heading_error*abs(error)));
             a=50;
-            linearspeed=min(maxspeed,(a+m*maxspeed));
+            if(size(sonar,2)>4)
+                cruize_control=max(0,maxspeed*(mean([sonar(4) sonar(5)]-300)/2500));
+            else
+                cruize_control=maxspeed;
+            end
+            linearspeed=min([maxspeed (a+m*maxspeed) cruize_control]);
 
             angularspeed=-radtodeg(((error)*(proportional_heading_step)/100)/T);
             
@@ -97,11 +118,42 @@ for i = 1:length(waypoints)
             pioneer_set_controls(SP,round(linearspeed,0),round(angularspeed,0));
             
             pose=pioneer_read_odometry();
-            pose(3)=degtorad((360*pose(3))/4096);
+            
+            %pose(3)=degtorad((360*pose(3))/4096);
+            pose(3)=(2*pi*rem(pose(3),4096)/4096);
+%             figure(2)
+%             
+%             compass(cos(pose(3)),sin(pose(3)));
+            figure(1)
+            quiver(pose(1),pose(2),100*cos(pose(3)),100*sin(pose(3)),10);
             scatter(pose(1),pose(2),'r');
-            [pose(1),pose(2),pose(3)]=correctOdometry(pose,distancerun,error_w);
+            if(i==1 || i==2)
+                heading_strengh=1;
+            elseif(i==3)
+                heading_strengh=1.95;
+                
+            elseif(i==4)
+                heading_strengh=1.55;
+                
+            elseif(i==5)
+                heading_strengh=0.7;
+                
+            elseif(i==6)
+                heading_strengh=0.75;
+            elseif(i==7)
+                heading_strengh=1;
+            end
+            [pose(1),pose(2),pose(3)]=correctOdometry(pose,distancerun,error_w,heading_strengh);
+%             figure(3)
+%             
+%             compass(cos(pose(3)),sin(pose(3)));
+%             figure(1)
+            if(i==extra)
+                distancerun=updatedistance(current_position(1),current_position(2),pose(1),pose(2),distancerun,2);
 
-            distancerun=updatedistance(current_position(1),current_position(2),pose(1),pose(2),distancerun);
+            else
+                distancerun=updatedistance(current_position(1),current_position(2),pose(1),pose(2),distancerun,1);
+            end
             current_position(1)=pose(1);
             current_position(2)=pose(2);
             current_heading=pose(3);
@@ -110,10 +162,12 @@ for i = 1:length(waypoints)
 %             current_position(2)=current_position(2)+linearspeed*sin(current_heading);
 
             scatter(current_position(1),current_position(2),'g');
+            quiver(pose(1),pose(2),100*cos(pose(3)),100*sin(pose(3)),10);            
             %[w,d]=calculateHeading(current_position(1),current_position(2),waypoints(i,1),waypoints(i,2));
             pause(0.05);
         end
     else
+        heading_strengh=1.95;
         while(d>waypoint_threshold/2)
             current_position=current_position+offset;
             
@@ -134,7 +188,7 @@ for i = 1:length(waypoints)
             
             m=min(((d-50)/1500),1)*min(1,1/(proportional_heading_error*abs(error)));
             a=50;
-            linearspeed=min(maxspeed,(a+m*maxspeed));
+            linearspeed=min(maxspeed/3,(a+m*maxspeed/3));
             
             angularspeed=-radtodeg(((error)*(proportional_heading_step)/100)/T);
             
@@ -144,9 +198,9 @@ for i = 1:length(waypoints)
             pose=pioneer_read_odometry();
             pose(3)=degtorad((360*pose(3))/4096);
             scatter(pose(1),pose(2),'r');
-            [pose(1),pose(2),pose(3)]=correctOdometry(pose,distancerun,error_w);
+            [pose(1),pose(2),pose(3)]=correctOdometry(pose,distancerun,error_w,heading_strengh);
             
-            distancerun=updatedistance(current_position(1),current_position(2),pose(1),pose(2),distancerun);
+            distancerun=updatedistance(current_position(1),current_position(2),pose(1),pose(2),distancerun,1);
             current_position(1)=pose(1);
             current_position(2)=pose(2);
             current_heading=pose(3);  
